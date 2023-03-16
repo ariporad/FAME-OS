@@ -1,0 +1,11 @@
+To speed up access to large files, it is generally preferred to map them to memory rather
+than access them via standard read/write. The mapped file can be accessed as a memory area
+accessible by a pointer (an array). This functionality is made possible by the virtual memory
+mechanism.
+To map a file, we use the "mmap" function (and "munmap" to close the memory mapping).
+1. Create a test.txt file containing some text.
+2. Open this file (via "open"), get its size back (via "fstat").
+3. Map the entire file to memory.
+4. Reverse the bytes of the file (the start bytes of the file are at the end).
+5. End memory mapping.
+6. Check that the text in the file has been reversed ("cat test.txt").
