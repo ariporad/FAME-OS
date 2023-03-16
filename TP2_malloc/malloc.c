@@ -7,11 +7,40 @@
 #define HEAP_MAGIC_NUMBER 0xBAAAAAAAAADA110CL
 #define MIN_BLOCK_SIZE 8
 
+#define CHECK_HEAP_VALID(return_val)            \
+	if (!heap.initialized)                      \
+	{                                           \
+		printf("ERROR! Heap uninitialized!\n"); \
+		return return_val;                      \
+	}                                           \
+	if (heap.corrupted)                         \
+	{                                           \
+		printf("ERROR! Heap corrupted!\n");     \
+		return return_val;                      \
+	}
+
+#define MARK_HEAP_CORRUPTED(reason, return_val)        \
+	printf("ERROR! Heap was corrupted! (%s)", reason); \
+	heap.corrupted = true;                             \
+	return return_val;
+
+#define CHECK_HEADER(header, return_val)                                                                                       \
+	if (header->magic_number != HEAP_MAGIC_NUMBER)                                                                             \
+	{                                                                                                                          \
+		printf("ERROR! Block was corrupted: magic number = %#lx (expected %#lx)!\n", header->magic_number, HEAP_MAGIC_NUMBER); \
+		heap.corrupted = true;                                                                                                 \
+		return return_val;                                                                                                     \
+	}
+
 struct HEAP
 {
 	struct HEADER_TAG *ptr_head;
 	struct HEADER_TAG *ptr_start;
 	size_t size;
+
+	// Status flags
+	bool initialized;
+	bool corrupted;
 } heap;
 
 // Provided in assignment
@@ -25,6 +54,7 @@ struct HEADER_TAG
 
 void *malloc_fame(size_t bytes)
 {
+	CHECK_HEAP_VALID(NULL);
 	printf("malloc: %lu bytes\n", bytes);
 
 	struct HEADER_TAG *cur = heap.ptr_head;
@@ -32,6 +62,7 @@ void *malloc_fame(size_t bytes)
 	{
 		// Scan to a block of sufficient size
 		// IDEA: scan the entire list for the smallest block of sufficient size
+		CHECK_HEADER(cur, NULL); // XXX: Is this too much checking?
 	}
 
 	if (cur == NULL || cur->size < bytes)
@@ -44,7 +75,8 @@ void *malloc_fame(size_t bytes)
 	if (cur->size > bytes + sizeof(struct HEADER_TAG) + MIN_BLOCK_SIZE)
 	{
 		// Break off the upper part of cur to a new block
-		struct HEADER_TAG *ptr_new = ((unsigned long)cur) + sizeof(struct HEADER_TAG) + bytes;
+		size_t offset = sizeof(struct HEADER_TAG) + bytes;
+		struct HEADER_TAG *ptr_new = (struct HEADER_TAG *)((size_t)cur + offset); // NOTE: cast requried otherwise pointer math is different
 		ptr_new->ptr_next = cur->ptr_next;
 		ptr_new->size = cur->size - sizeof(struct HEADER_TAG) - bytes;
 		ptr_new->magic_number = HEAP_MAGIC_NUMBER;
@@ -59,11 +91,19 @@ void *malloc_fame(size_t bytes)
 	// TODO: Don't use flag, just remove from linked list.
 	cur->available = false;
 
-	return cur;
+	// Return the start of the data, which is after the start of the header
+	return cur + 1; // NB: because we don't do a typecast here, `+ 1` means `+ 1 * sizeof(struct HEADER_TAG)`
 }
 
 void free_fame(void *ptr)
 {
+	printf("Freeing: %p...\n", ptr);
+	CHECK_HEAP_VALID();
+	struct HEADER_TAG *ptr_header = (struct HEADER_TAG *)((unsigned long)ptr - sizeof(struct HEADER_TAG));
+	printf("Computed header address: %p\n", ptr_header);
+	CHECK_HEADER(ptr_header, );
+	ptr_header->available = true;
+	// TODO: merge with adjacent blocks
 }
 
 void init_malloc_fame()
@@ -73,11 +113,14 @@ void init_malloc_fame()
 	heap.size = HEAP_DEFAULT_SIZE;
 	heap.ptr_start = sbrk(heap.size); // allocate some memory
 	heap.ptr_head = heap.ptr_start;
+	heap.corrupted = false;
 
 	heap.ptr_head->ptr_next = NULL;
 	heap.ptr_head->size = heap.size - sizeof(struct HEADER_TAG);
 	heap.ptr_head->magic_number = HEAP_MAGIC_NUMBER;
 	heap.ptr_head->available = true;
+
+	heap.initialized = true;
 	printf("Done initializing heap...\n");
 }
 
@@ -112,8 +155,16 @@ int main(int argc, char **argv)
 	void *ptr3_128 = malloc_fame(128);
 	printf("ptr3 (128 bytes): %p (d = %lu)\n", ptr3_128, ptr3_128 - ptr2_8);
 	print_heap();
-	void *ptr4_128 = malloc_fame(128);
-	printf("ptr4 (128 bytes): %p (d = %lu)\n", ptr4_128, ptr4_128 - ptr3_128);
+	void *ptr4_128_null = malloc_fame(128);
+	printf("ptr4 (128 bytes): %p (expected NULL)\n", ptr4_128_null);
+	print_heap();
+
+	free_fame(ptr3_128);
+	printf("freed ptr3_128\n");
+	print_heap();
+
+	void *ptr5_128 = malloc_fame(128);
+	printf("ptr5 (128 bytes): %p (d = %lu)\n", ptr5_128, ptr5_128 - ptr2_8);
 	print_heap();
 
 	return 0;
