@@ -8,6 +8,14 @@
 #define HEAP_MAGIC_NUMBER 0xBAAAAAAAAADA110CL
 #define MIN_BLOCK_SIZE 8
 
+#define ENABLE_VERBOSE_LOGGING
+
+#ifdef ENABLE_VERBOSE_LOGGING
+#define DEBUG_LOG(args...) printf(args);
+#else
+#define DEBUG_LOG(args...)
+#endif // ENABLE_VERBOSE_LOGGING
+
 #define CHECK_HEAP_VALID(return_val)            \
 	if (!heap.initialized)                      \
 	{                                           \
@@ -35,8 +43,7 @@
 	if (header->magic_number != HEAP_MAGIC_NUMBER)                                                                             \
 	{                                                                                                                          \
 		printf("ERROR! Block was corrupted: magic number = %#lx (expected %#lx)!\n", header->magic_number, HEAP_MAGIC_NUMBER); \
-		heap.corrupted = true;                                                                                                 \
-		return return_val;                                                                                                     \
+		MARK_HEAP_CORRUPTED("Block corrupted", return_val);                                                                    \
 	}
 
 struct HEAP
@@ -61,7 +68,7 @@ struct HEADER_TAG
 void *malloc_fame(size_t bytes)
 {
 	CHECK_HEAP_VALID(NULL);
-	printf("malloc: %lu bytes\n", bytes);
+	DEBUG_LOG("malloc: %lu bytes\n", bytes);
 
 	struct HEADER_TAG *prev = NULL;
 	struct HEADER_TAG *cur = heap.ptr_head;
@@ -111,7 +118,7 @@ void *malloc_fame(size_t bytes)
 	// Zero it out first
 	memset(ret, 0, cur->size);
 
-	printf("malloc: cur = %p, ret = %p\n", cur, ret);
+	DEBUG_LOG("malloc: cur = %p, ret = %p\n", cur, ret);
 
 	return ret;
 }
@@ -131,15 +138,15 @@ void _attempt_to_merge(struct HEADER_TAG *cur)
 
 void free_fame(void *ptr)
 {
-	printf("Freeing: %p...\n", ptr);
+	DEBUG_LOG("Freeing: %p...\n", ptr);
 	CHECK_HEAP_VALID();
 	struct HEADER_TAG *ptr_block = ((struct HEADER_TAG *)ptr) - 1; // (struct HEADER_TAG *)((unsigned long)ptr - sizeof(struct HEADER_TAG));
-	printf("Computed header address: %p\n", ptr_block);
+	DEBUG_LOG("Computed header address: %p\n", ptr_block);
 	CHECK_HEADER(ptr_block, );
 
 	if (ptr_block->ptr_next != NULL)
 	{
-		printf("WARNING: attempted to free a block that was already free!\n");
+		DEBUG_LOG("WARNING: attempted to free a block that was already free!\n");
 		return; // XXX: ???
 	}
 
@@ -178,8 +185,8 @@ void free_fame(void *ptr)
 
 void init_malloc_fame()
 {
-	printf("Initializing heap...\n");
-	printf("FYI: sizeof(struct HEADER_TAG) = %lu\n", sizeof(struct HEADER_TAG));
+	DEBUG_LOG("Initializing heap...\n");
+	DEBUG_LOG("FYI: sizeof(struct HEADER_TAG) = %lu\n", sizeof(struct HEADER_TAG));
 	heap.size = HEAP_DEFAULT_SIZE;
 	heap.ptr_start = sbrk(heap.size); // allocate some memory
 	heap.ptr_head = heap.ptr_start;
@@ -190,23 +197,23 @@ void init_malloc_fame()
 	heap.ptr_head->magic_number = HEAP_MAGIC_NUMBER;
 
 	heap.initialized = true;
-	printf("Done initializing heap...\n");
+	DEBUG_LOG("Done initializing heap...\n");
 }
 
 void print_heap()
 {
-	printf("\n------------------------------------- HEAP -------------------------------------\n");
+	DEBUG_LOG("\n------------------------------------- HEAP -------------------------------------\n");
 
-	printf("Heap: size = %lu, start = %p, head = %p\n\n", heap.size, heap.ptr_start, heap.ptr_head);
+	DEBUG_LOG("Heap: size = %lu, start = %p, head = %p\n\n", heap.size, heap.ptr_start, heap.ptr_head);
 
 	struct HEADER_TAG *cur = heap.ptr_head;
 	for (int i = 0; cur != NULL; i++, cur = cur->ptr_next)
 	{
 		unsigned long diff = cur->ptr_next != NULL ? ((unsigned long)cur->ptr_next) - ((unsigned long)cur) : 0;
-		printf("[%d]: @%p, next: %p (d: %lu), size: %lu, %s\n", i, cur, cur->ptr_next, diff, cur->size, cur->magic_number == HEAP_MAGIC_NUMBER ? "VALID" : "CORRUPT");
+		DEBUG_LOG("[%d]: @%p, next: %p (d: %lu), size: %lu, %s\n", i, cur, cur->ptr_next, diff, cur->size, cur->magic_number == HEAP_MAGIC_NUMBER ? "VALID" : "CORRUPT");
 	}
 
-	printf("--------------------------------------------------------------------------------\n\n");
+	DEBUG_LOG("--------------------------------------------------------------------------------\n\n");
 }
 
 int main(int argc, char **argv)
