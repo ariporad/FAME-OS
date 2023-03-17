@@ -1,3 +1,8 @@
+/*
+NOTE: I didn't realize we needed to turn in part 1-5 seperately, so this is exactly the same as my
+final version with a few things stripped out. If possible, I recommend just skipping this one and
+looking at that one instead.
+*/
 #include <stdlib.h>
 #include <stdio.h>
 #include <unistd.h>
@@ -67,20 +72,7 @@ struct HEADER_TAG
 	long magic_number;			 /* 0xBAAAAAAAAADA110CL */
 };
 
-void _attempt_to_merge(struct HEADER_TAG *cur)
-{
-	if (cur == NULL)
-		return;
-	size_t offset = sizeof(struct HEADER_TAG) + cur->size;
-	struct HEADER_TAG *expected_next_block = (struct HEADER_TAG *)((size_t)cur + offset); // NOTE: cast requried otherwise pointer math is different
-	if (cur->ptr_next != NULL && cur->ptr_next == expected_next_block)
-	{
-		cur->size += sizeof(struct HEADER_TAG) + cur->ptr_next->size;
-		cur->ptr_next = cur->ptr_next->ptr_next;
-	}
-}
-
-void _add_free_block_after(struct HEADER_TAG *ptr_block, struct HEADER_TAG *prev, struct HEADER_TAG *cur)
+void _add_free_fame_block_after(struct HEADER_TAG *ptr_block, struct HEADER_TAG *prev, struct HEADER_TAG *cur)
 {
 	ASSERT_NOT_CORRUPTED(ptr_block->ptr_next == NULL, "attempted to add a block to the free list twice!", );
 
@@ -97,19 +89,12 @@ void _add_free_block_after(struct HEADER_TAG *ptr_block, struct HEADER_TAG *prev
 		prev->ptr_next = ptr_block;
 		ptr_block->ptr_next = cur;
 	}
-
-	// Attempt to merge with both the prior and subsequent blocks
-	_attempt_to_merge(ptr_block);
-	if (prev != NULL)
-	{
-		_attempt_to_merge(prev);
-	}
 }
 
-void *malloc(size_t bytes)
+void *malloc_fame(size_t bytes)
 {
 	CHECK_HEAP_VALID(NULL);
-	DEBUG_LOG("malloc: %lu bytes\n", bytes);
+	DEBUG_LOG("malloc_fame: %lu bytes\n", bytes);
 
 	struct HEADER_TAG *prev = NULL;
 	struct HEADER_TAG *cur = heap.ptr_head;
@@ -140,24 +125,9 @@ void *malloc(size_t bytes)
 			CHECK_HEADER(cur, NULL);
 		}
 
-		_add_free_block_after(ptr_block, prev, cur);
+		_add_free_fame_block_after(ptr_block, prev, cur);
 
 		cur = ptr_block;
-	}
-
-	// Split big blocks
-	if (cur->size > bytes + sizeof(struct HEADER_TAG) + MIN_BLOCK_SIZE)
-	{
-		// Break off the upper part of cur to a new block
-		size_t offset = sizeof(struct HEADER_TAG) + bytes;
-		struct HEADER_TAG *ptr_new = (struct HEADER_TAG *)((size_t)cur + offset); // NOTE: cast requried otherwise pointer math is different
-		ptr_new->ptr_next = cur->ptr_next;
-		ptr_new->size = cur->size - sizeof(struct HEADER_TAG) - bytes;
-		ptr_new->magic_number = HEAP_MAGIC_NUMBER;
-
-		// Resize cur
-		cur->ptr_next = ptr_new;
-		cur->size = bytes;
 	}
 
 	// Remove cur from the chain of available blocks
@@ -178,12 +148,12 @@ void *malloc(size_t bytes)
 	// Zero it out first
 	memset(ret, 0, cur->size);
 
-	DEBUG_LOG("malloc: cur = %p, ret = %p\n", cur, ret);
+	DEBUG_LOG("malloc_fame: cur = %p, ret = %p\n", cur, ret);
 
 	return ret;
 }
 
-void free(void *ptr)
+void free_fame(void *ptr)
 {
 	DEBUG_LOG("Freeing: %p...\n", ptr);
 	CHECK_HEAP_VALID();
@@ -193,7 +163,7 @@ void free(void *ptr)
 
 	if (ptr_block->ptr_next != NULL)
 	{
-		DEBUG_LOG("WARNING: attempted to free a block that was already free!\n");
+		DEBUG_LOG("WARNING: attempted to free_fame a block that was already free_fame!\n");
 		return; // XXX: ???
 	}
 
@@ -207,10 +177,10 @@ void free(void *ptr)
 		cur = cur->ptr_next;
 	}
 
-	_add_free_block_after(ptr_block, prev, cur);
+	_add_free_fame_block_after(ptr_block, prev, cur);
 }
 
-void init_malloc()
+void init_malloc_fame()
 {
 	DEBUG_LOG("Initializing heap...\n");
 	DEBUG_LOG("FYI: sizeof(struct HEADER_TAG) = %lu\n", sizeof(struct HEADER_TAG));
@@ -251,11 +221,11 @@ void print_heap()
 int main(int argc, char **argv)
 {
 	// Setup
-	init_malloc();
+	init_malloc_fame();
 	print_heap();
 
-	// Test malloc
-	void *ptr1_1 = malloc(1);
+	// Test malloc_fame
+	void *ptr1_1 = malloc_fame(1);
 	printf("ptr1 (  1 bytes): %p\n", ptr1_1);
 	print_heap();
 	void *ptr2_8 = malloc_fame(8);
@@ -268,20 +238,20 @@ int main(int argc, char **argv)
 	printf("ptr3 (128 bytes): %p (d = %lu)\n", ptr3_128, ptr3_128 - ptr2_8);
 	print_heap();
 
-	// Test free
-	printf("freeing ptr2_8\n");
+	// Test free_fame
+	printf("free_fameing ptr2_8\n");
 	free_fame(ptr2_8);
-	printf("freed ptr2_8\n");
+	printf("free_famed ptr2_8\n");
 	print_heap();
 
-	printf("freeing ptr4_256\n");
+	printf("free_fameing ptr4_256\n");
 	free_fame(ptr4_256);
-	printf("freed ptr4_256\n");
+	printf("free_famed ptr4_256\n");
 	print_heap();
 
-	printf("freeing ptr3_128\n");
+	printf("free_fameing ptr3_128\n");
 	free_fame(ptr3_128);
-	printf("freed ptr3_128\n");
+	printf("free_famed ptr3_128\n");
 	print_heap();
 
 	void *ptr6_128 = malloc_fame(128);
@@ -301,7 +271,7 @@ int main(int argc, char **argv)
 	}
 
 	printf("This should fail due to corruption:\n");
-	free_fame(ptr2_8); // NB: we have to free the block *after* the one we corrupted, since the header is before.
+	free_fame(ptr2_8); // NB: we have to free_fame the block *after* the one we corrupted, since the header is before.
 
 	printf("This should also fail due to corruption:\n");
 	void *failed = malloc_fame(3);
