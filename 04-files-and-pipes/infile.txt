@@ -1,0 +1,20 @@
+Opens with the specified application.
+Opens with the specified application bundle identifier.
+Opens with TextEdit.
+Opens with default text editor.
+Reads input from standard input and opens with TextEdit.
+Launches the app fresh, that is, without restoring windows. Saved persistent state is lost, excluding Untitled documents.
+Selects in the Finder instead of opening.
+Blocks until the used applications are closed (even if they were already running).
+All remaining arguments are passed in argv to the application's main() function instead of opened.
+Open a new instance of the application even if one is already running.
+Launches the app hidden.
+Does not bring the application to the foreground.
+Searches header file locations for headers matching the given filenames, and opens them.
+For -h, the SDK to use; if supplied, only SDKs whose names contain the argument value are searched.
+Otherwise the highest versioned SDK in each platform is used.
+Open this URL, even if it matches exactly a filepath
+Launches the application with stdin connected to PATH; defaults to /dev/null
+Launches the application with /dev/stdout connected to PATH;
+Launches the application with /dev/stderr connected to PATH to
+Add an enviroment variable to the launched process, where VAR is formatted AAA=foo or just AAA for a null string value.
